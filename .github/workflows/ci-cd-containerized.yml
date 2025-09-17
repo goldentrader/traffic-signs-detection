@@ -15,7 +15,6 @@ env:
   POSTGRESQL_SERVER_NAME: psql-traffic-sign-prod-new
   POSTGRESQL_DATABASE_NAME: traffic_sign_db
   REDIS_CACHE_NAME: redis-traffic-sign-detector-prod
-  LOCATION: eastus
 
 jobs:
   build-and-push-backend:
@@ -72,7 +71,7 @@ jobs:
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-  deploy:
+  deploy-apps:
     runs-on: ubuntu-latest
     needs: [build-and-push-backend, build-and-push-frontend]
     environment: production
@@ -109,7 +108,7 @@ jobs:
 
     - name: Run Django Migrations
       run: |
-        echo "Manual step: Run Django migrations on the backend container."
-        echo "You would typically do this via a startup script in your backend Dockerfile or a separate job."
-        echo "Example if using Azure CLI to run a command:"
-        echo "az containerapp exec -n ${{ env.AZURE_BACKEND_CONTAINER_APP }} -g ${{ env.AZURE_RESOURCE_GROUP }} --command 'python manage.py migrate'"
+        echo "✅ Application deployment completed!"
+        echo "📝 Note: Django migrations should be handled in the container startup script"
+        echo "🔗 Backend URL: https://${{ env.AZURE_BACKEND_CONTAINER_APP }}.azurecontainerapps.io"
+        echo "🔗 Frontend URL: https://${{ env.AZURE_FRONTEND_CONTAINER_APP }}.azurecontainerapps.io"
