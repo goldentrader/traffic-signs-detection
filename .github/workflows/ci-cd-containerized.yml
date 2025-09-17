@@ -41,8 +41,6 @@ jobs:
         tags: |
           ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:${{ github.sha }}
           ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
 
   build-and-push-frontend:
     runs-on: ubuntu-latest
@@ -68,8 +66,6 @@ jobs:
         tags: |
           ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:${{ github.sha }}
           ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:latest
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
 
   deploy-apps:
     runs-on: ubuntu-latest
