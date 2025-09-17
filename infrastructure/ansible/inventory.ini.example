@@ -1,0 +1,17 @@
+# Traffic Sign Detection System - Ansible Inventory
+# Copy this file to inventory.ini and configure with your server details
+
+[all]
+# Replace with your actual server IP and SSH details
+your-server-ip ansible_user=azureuser ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+[webservers]
+your-server-ip
+
+[databases]
+# Add database servers if using external databases
+# db-server-ip ansible_user=postgres
+
+[redis]
+# Add Redis servers if using external Redis
+# redis-server-ip ansible_user=redis

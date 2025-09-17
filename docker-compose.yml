@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: traffic_sign_detector
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=your-secret-key-for-development
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/traffic_sign_detector
+      - REDIS_URL=redis://redis:6379/0
+      - ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./backend/media:/app/backend/media
+      - ./yolov8-gtsrb-trained.pt:/app/yolov8-gtsrb-trained.pt
+    command: >
+      sh -c "
+        python manage.py migrate &&
+        python manage.py collectstatic --noinput &&
+        gunicorn --bind 0.0.0.0:8000 --workers 2 --reload traffic_sign_detector.wsgi:application
+      "
+
+volumes:
+  postgres_data:
+  redis_data: 

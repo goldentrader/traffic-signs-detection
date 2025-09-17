@@ -1,0 +1,249 @@
+---
+# Traffic Sign Detection System - Ansible Playbook
+- name: Configure Traffic Sign Detection System
+  hosts: all
+  become: yes
+  vars:
+    app_user: "{{ ansible_user }}"
+    app_dir: "/opt/traffic-sign-detector"
+    python_version: "3.10"
+    node_version: "20"
+    
+  tasks:
+    - name: Update system packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+      when: ansible_os_family == "Debian"
+
+    - name: Install system dependencies
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+          - python3-dev
+          - build-essential
+          - libpq-dev
+          - libgl1-mesa-glx
+          - libglib2.0-0
+          - libsm6
+          - libxext6
+          - libxrender-dev
+          - libgomp1
+          - wget
+          - curl
+          - git
+          - nginx
+          - supervisor
+          - redis-server
+          - postgresql-client
+          - software-properties-common
+          - apt-transport-https
+          - ca-certificates
+          - gnupg
+          - lsb-release
+        state: present
+
+    - name: Add NodeSource repository
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_{{ node_version }}.x | sudo -E bash -
+      args:
+        creates: /etc/apt/sources.list.d/nodesource.list
+
+    - name: Install Node.js
+      apt:
+        name: nodejs
+        state: present
+        update_cache: yes
+
+    - name: Install Docker
+      shell: |
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+        apt-get update
+        apt-get install -y docker-ce docker-ce-cli containerd.io
+      args:
+        creates: /usr/bin/docker
+
+    - name: Add user to docker group
+      user:
+        name: "{{ app_user }}"
+        groups: docker
+        append: yes
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Start and enable Redis service
+      systemd:
+        name: redis-server
+        state: started
+        enabled: yes
+
+    - name: Start and enable Nginx service
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+
+    - name: Create virtual environment
+      pip:
+        name: virtualenv
+        state: present
+
+    - name: Create Python virtual environment
+      shell: "python3 -m venv {{ app_dir }}/venv"
+      args:
+        creates: "{{ app_dir }}/venv/bin/activate"
+
+    - name: Install Python dependencies
+      pip:
+        requirements: "{{ app_dir }}/requirements.txt"
+        virtualenv: "{{ app_dir }}/venv"
+        virtualenv_python: python3
+      become_user: "{{ app_user }}"
+
+    - name: Install Node.js dependencies
+      npm:
+        path: "{{ app_dir }}/frontend"
+        state: present
+      become_user: "{{ app_user }}"
+
+    - name: Build React application
+      npm:
+        path: "{{ app_dir }}/frontend"
+        state: present
+        production: yes
+      environment:
+        NODE_ENV: production
+      become_user: "{{ app_user }}"
+
+    - name: Create Django settings for production
+      template:
+        src: django_settings.py.j2
+        dest: "{{ app_dir }}/backend/traffic_sign_detector/settings_prod.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0644'
+
+    - name: Create environment file
+      template:
+        src: .env.j2
+        dest: "{{ app_dir }}/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0600'
+
+    - name: Run Django migrations
+      shell: |
+        source {{ app_dir }}/venv/bin/activate
+        cd {{ app_dir }}/backend
+        python manage.py migrate --settings=traffic_sign_detector.settings_prod
+      become_user: "{{ app_user }}"
+
+    - name: Collect static files
+      shell: |
+        source {{ app_dir }}/venv/bin/activate
+        cd {{ app_dir }}/backend
+        python manage.py collectstatic --noinput --settings=traffic_sign_detector.settings_prod
+      become_user: "{{ app_user }}"
+
+    - name: Create superuser
+      shell: |
+        source {{ app_dir }}/venv/bin/activate
+        cd {{ app_dir }}/backend
+        echo "from django.contrib.auth.models import User; User.objects.create_superuser('admin', 'admin@example.com', '{{ django_admin_password }}')" | python manage.py shell --settings=traffic_sign_detector.settings_prod
+      become_user: "{{ app_user }}"
+      ignore_errors: yes
+
+    - name: Configure Nginx
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/sites-available/traffic-sign-detector
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Enable Nginx site
+      file:
+        src: /etc/nginx/sites-available/traffic-sign-detector
+        dest: /etc/nginx/sites-enabled/traffic-sign-detector
+        state: link
+
+    - name: Remove default Nginx site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+      failed_when: nginx_test.rc != 0
+
+    - name: Reload Nginx
+      systemd:
+        name: nginx
+        state: reloaded
+
+    - name: Configure Supervisor
+      template:
+        src: supervisor.conf.j2
+        dest: /etc/supervisor/conf.d/traffic-sign-detector.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Update Supervisor configuration
+      supervisorctl:
+        name: traffic-sign-detector
+        state: present
+        config: /etc/supervisor/conf.d/traffic-sign-detector.conf
+
+    - name: Start application with Supervisor
+      supervisorctl:
+        name: traffic-sign-detector
+        state: started
+
+    - name: Configure firewall
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "22"
+        - "80"
+        - "443"
+        - "8000"
+
+    - name: Enable firewall
+      ufw:
+        state: enabled
+        policy: deny
+        direction: incoming
+
+    - name: Install Azure CLI
+      shell: |
+        curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+      args:
+        creates: /usr/bin/az
+
+    - name: Install Azure Monitor agent
+      shell: |
+        wget https://github.com/microsoft/azure-diagnostics-tools/releases/download/v1.0.0/azdiag-1.0.0.tar.gz
+        tar -xzf azdiag-1.0.0.tar.gz
+        sudo ./azdiag-1.0.0/install.sh
+      args:
+        creates: /opt/microsoft/omsagent/bin/omsagent
+      ignore_errors: yes

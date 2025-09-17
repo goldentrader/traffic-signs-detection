@@ -1,0 +1,33 @@
+# Traffic Sign Detection System - Terraform Variables
+# Copy this file to terraform.tfvars and fill in your values
+
+project_name = "traffic-sign-detector"
+environment  = "prod"
+location     = "East US"
+vm_size      = "Standard_D4s_v3"
+admin_username = "azureuser"
+
+# SSH Public Key (generate with: ssh-keygen -t rsa -b 4096 -C "your_email@example.com")
+ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQ... your_email@example.com"
+
+# Database credentials
+db_admin_username = "postgres"
+db_admin_password = "YourSecurePassword123!"
+
+# Django secret key (generate with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())")
+django_secret_key = "your-django-secret-key-here"
+
+# Optional: Domain configuration
+domain_name = "your-domain.com"
+ssl_certificate_path = "/path/to/certificate.crt"
+ssl_private_key_path = "/path/to/private.key"
+
+# Terraform Backend Configuration (uncomment and configure)
+# terraform {
+#   backend "azurerm" {
+#     resource_group_name  = "terraform-state-rg"
+#     storage_account_name = "terraformstate123"
+#     container_name       = "tfstate"
+#     key                  = "traffic-sign-detector.tfstate"
+#   }
+# }

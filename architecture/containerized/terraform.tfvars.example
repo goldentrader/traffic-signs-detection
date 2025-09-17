@@ -1,0 +1,47 @@
+# Project Configuration
+project_name = "traffic-sign-detector"
+environment = "prod"
+location = "eastus"
+
+# Database Configuration
+db_admin_username = "your-db-username"
+db_admin_password = "your-secure-db-password"
+database_name = "traffic_sign_db"
+
+# Django Configuration
+django_secret_key = "your-super-secret-django-key-here"
+jwt_secret = "your-jwt-secret-key-here"
+
+# Redis Configuration
+redis_password = "your-secure-redis-password"
+
+# Application Configuration
+app_name = "Traffic Sign Detector"
+app_env = "production"
+
+# Container Registry
+container_registry_sku = "Basic"
+
+# PostgreSQL Configuration
+postgresql_sku = "B_Gen5_1"
+
+# Redis Configuration
+redis_sku = "Basic"
+
+# Container Apps Configuration
+min_replicas = 1
+max_replicas = 10
+cpu_limit = "1.0"
+memory_limit = "2Gi"
+
+# Domain Configuration (optional)
+domain_name = ""
+dns_zone_id = ""
+
+# Tags
+tags = {
+  Environment = "production"
+  Project = "traffic-sign-detector"
+  Owner = "your-email@example.com"
+  CostCenter = "development"
+}

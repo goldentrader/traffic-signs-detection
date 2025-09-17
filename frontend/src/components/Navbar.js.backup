@@ -1,0 +1,70 @@
+import React, { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Camera, BarChart3, History, Home, User, LogOut, Settings, LogIn, UserPlus, Menu, X } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+
+const Navbar = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, logout } = useAuth();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const navItems = [
+    { path: '/', name: 'Dashboard', icon: Home },
+    { path: '/realtime', name: 'Real-time Detection', icon: Camera, requireAuth: true },
+    { path: '/history', name: 'History', icon: History, requireAuth: true },
+    { path: '/statistics', name: 'Statistics', icon: BarChart3, requireAuth: true },
+  ];
+
+  const handleLogout = async () => {
+    await logout();
+    setIsUserMenuOpen(false);
+    navigate('/');
+  };
+
+  const filteredNavItems = navItems.filter(item => !item.requireAuth || isAuthenticated);
+
+  return (
+    <nav className="bg-white shadow-sm border-b border-gray-200">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
+                <Camera className="w-5 h-5 text-white" />
+              </div>
+              <span className="text-xl font-bold text-gray-900">
+                Traffic Sign Detector
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                    isActive
+                      ? 'bg-primary-100 text-primary-700'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{item.name}</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+};
+
+export default Navbar; 

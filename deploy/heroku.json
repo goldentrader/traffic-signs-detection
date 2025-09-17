@@ -1,0 +1,49 @@
+{
+  "name": "Traffic Sign Detector",
+  "description": "Real-time traffic sign detection using YOLOv8 and GTSRB dataset",
+  "image": "heroku/python",
+  "repository": "https://github.com/your-username/traffic-sign-detector",
+  "keywords": ["python", "django", "react", "yolo", "computer-vision", "traffic-signs"],
+  "success_url": "/",
+  "env": {
+    "SECRET_KEY": {
+      "description": "Django secret key for cryptographic signing",
+      "generator": "secret"
+    },
+    "DEBUG": {
+      "description": "Enable debug mode",
+      "value": "False"
+    },
+    "ALLOWED_HOSTS": {
+      "description": "Comma-separated list of allowed hosts",
+      "value": ".herokuapp.com"
+    },
+    "DATABASE_URL": {
+      "description": "PostgreSQL database URL (auto-provisioned)"
+    },
+    "REDIS_URL": {
+      "description": "Redis URL for channels (auto-provisioned)"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "addons": [
+    "heroku-postgresql:mini",
+    "heroku-redis:mini"
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    },
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "scripts": {
+    "postdeploy": "python backend/manage.py migrate && python backend/manage.py collectstatic --noinput"
+  }
+} 

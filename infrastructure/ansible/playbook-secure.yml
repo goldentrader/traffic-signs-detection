@@ -1,0 +1,138 @@
+---
+# Secure Ansible Playbook - No secrets in code
+- name: Deploy Traffic Sign Detector Securely
+  hosts: all
+  become: yes
+  vars:
+    app_name: "traffic-sign-detector"
+    app_user: "appuser"
+    app_dir: "/opt/{{ app_name }}"
+    
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - python3
+          - python3-pip
+          - python3-venv
+          - nginx
+          - supervisor
+          - redis-server
+          - postgresql-client
+        state: present
+        update_cache: yes
+
+    - name: Create application user
+      user:
+        name: "{{ app_user }}"
+        system: yes
+        shell: /bin/bash
+        home: "{{ app_dir }}"
+        create_home: yes
+
+    - name: Create application directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+
+    - name: Copy application code
+      copy:
+        src: "{{ item }}"
+        dest: "{{ app_dir }}/"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+      with_items:
+        - "backend/"
+        - "frontend/"
+        - "requirements.txt"
+        - "yolov8-gtsrb-trained.pt"
+
+    - name: Create Python virtual environment
+      pip:
+        name: pip
+        virtualenv: "{{ app_dir }}/venv"
+        virtualenv_python: python3
+        state: present
+
+    - name: Install Python dependencies
+      pip:
+        requirements: "{{ app_dir }}/requirements.txt"
+        virtualenv: "{{ app_dir }}/venv"
+        state: present
+
+    - name: Create environment file from secrets
+      template:
+        src: "env.j2"
+        dest: "{{ app_dir }}/.env"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0600'
+      vars:
+        # These will be loaded from Azure Key Vault or environment variables
+        database_url: "{{ lookup('env', 'DATABASE_URL') }}"
+        redis_url: "{{ lookup('env', 'REDIS_URL') }}"
+        secret_key: "{{ lookup('env', 'SECRET_KEY') }}"
+        jwt_secret: "{{ lookup('env', 'JWT_SECRET') }}"
+
+    - name: Run database migrations
+      command: "{{ app_dir }}/venv/bin/python manage.py migrate"
+      args:
+        chdir: "{{ app_dir }}/backend"
+      become_user: "{{ app_user }}"
+
+    - name: Collect static files
+      command: "{{ app_dir }}/venv/bin/python manage.py collectstatic --noinput"
+      args:
+        chdir: "{{ app_dir }}/backend"
+      become_user: "{{ app_user }}"
+
+    - name: Create supervisor configuration
+      template:
+        src: "supervisor.conf.j2"
+        dest: "/etc/supervisor/conf.d/{{ app_name }}.conf"
+        mode: '0644'
+      notify: restart supervisor
+
+    - name: Create nginx configuration
+      template:
+        src: "nginx.conf.j2"
+        dest: "/etc/nginx/sites-available/{{ app_name }}"
+        mode: '0644'
+      notify: restart nginx
+
+    - name: Enable nginx site
+      file:
+        src: "/etc/nginx/sites-available/{{ app_name }}"
+        dest: "/etc/nginx/sites-enabled/{{ app_name }}"
+        state: link
+      notify: restart nginx
+
+    - name: Remove default nginx site
+      file:
+        path: "/etc/nginx/sites-enabled/default"
+        state: absent
+      notify: restart nginx
+
+    - name: Start and enable services
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      with_items:
+        - supervisor
+        - nginx
+        - redis-server
+
+  handlers:
+    - name: restart supervisor
+      systemd:
+        name: supervisor
+        state: restarted
+
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted

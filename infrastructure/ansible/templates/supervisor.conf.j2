@@ -1,0 +1,37 @@
+# Traffic Sign Detection System - Supervisor Configuration
+
+[program:traffic-sign-detector]
+command={{ app_dir }}/venv/bin/gunicorn --bind 127.0.0.1:8000 --workers 3 --timeout 120 --max-requests 1000 --max-requests-jitter 100 traffic_sign_detector.wsgi:application
+directory={{ app_dir }}/backend
+user={{ app_user }}
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/traffic-sign-detector.log
+stdout_logfile_maxbytes=50MB
+stdout_logfile_backups=10
+environment=DJANGO_SETTINGS_MODULE="traffic_sign_detector.settings_prod"
+
+[program:traffic-sign-detector-celery]
+command={{ app_dir }}/venv/bin/celery -A traffic_sign_detector worker --loglevel=info
+directory={{ app_dir }}/backend
+user={{ app_user }}
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/traffic-sign-detector-celery.log
+stdout_logfile_maxbytes=50MB
+stdout_logfile_backups=10
+environment=DJANGO_SETTINGS_MODULE="traffic_sign_detector.settings_prod"
+
+[program:traffic-sign-detector-celery-beat]
+command={{ app_dir }}/venv/bin/celery -A traffic_sign_detector beat --loglevel=info
+directory={{ app_dir }}/backend
+user={{ app_user }}
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/log/traffic-sign-detector-celery-beat.log
+stdout_logfile_maxbytes=50MB
+stdout_logfile_backups=10
+environment=DJANGO_SETTINGS_MODULE="traffic_sign_detector.settings_prod"
