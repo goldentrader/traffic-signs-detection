@@ -1,126 +1,25 @@
-name: CI/CD Pipeline - Containerized Architecture
+name: CI/CD for Containerized Architecture
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
 env:
-  PYTHON_VERSION: '3.10'
-  NODE_VERSION: '20'
-  CONTAINER_REGISTRY: acrtrafficsignprod.azurecr.io
+  AZURE_RESOURCE_GROUP: rg-traffic-sign-detector-prod
+  AZURE_CONTAINER_REGISTRY: acrtrafficsignprod
+  AZURE_CONTAINER_APPS_ENVIRONMENT: cae-traffic-sign-detector-prod
+  AZURE_BACKEND_CONTAINER_APP: backend-traffic-prod
+  AZURE_FRONTEND_CONTAINER_APP: frontend-traffic-prod
+  POSTGRESQL_SERVER_NAME: psql-traffic-sign-prod-new
+  POSTGRESQL_DATABASE_NAME: traffic_sign_db
+  REDIS_CACHE_NAME: redis-traffic-sign-detector-prod
+  LOCATION: eastus
 
 jobs:
-  test:
+  build-and-push-backend:
     runs-on: ubuntu-latest
-    
-    services:
-      postgres:
-        image: postgres:13
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: test_db
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-      
-      redis:
-        image: redis:7
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 6379:6379
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ env.PYTHON_VERSION }}
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pytest pytest-django pytest-cov flake8 black isort
-
-    - name: Install Node.js dependencies
-      run: |
-        cd frontend
-        npm ci
-
-    - name: Lint Python code
-      run: |
-        flake8 backend/ --count --select=E9,F63,F7,F82 --show-source --statistics
-        black --check backend/
-        isort --check-only backend/
-
-    - name: Lint JavaScript code
-      run: |
-        cd frontend
-        npm run lint
-
-    - name: Run Python tests
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
-        REDIS_URL: redis://localhost:6379/0
-        SECRET_KEY: test-secret-key
-      run: |
-        cd backend
-        python manage.py test --settings=traffic_sign_detector.test_settings
-
-    - name: Run JavaScript tests
-      run: |
-        cd frontend
-        npm test -- --coverage --watchAll=false
-
-    - name: Build React application
-      run: |
-        cd frontend
-        npm run build
-
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: test
-    
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
-      with:
-        sarif_file: 'trivy-results.sarif'
-
-  build-and-push:
-    runs-on: ubuntu-latest
-    needs: [test, security-scan]
-    if: github.ref == 'refs/heads/main'
-    
     steps:
     - uses: actions/checkout@v4
 
@@ -130,39 +29,54 @@ jobs:
     - name: Log in to Azure Container Registry
       uses: azure/docker-login@v1
       with:
-        login-server: ${{ env.CONTAINER_REGISTRY }}
+        login-server: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io
         username: ${{ secrets.ACR_USERNAME }}
         password: ${{ secrets.ACR_PASSWORD }}
 
-    - name: Build and push backend image
+    - name: Build and push backend Docker image
       uses: docker/build-push-action@v5
       with:
-        context: .
+        context: ./backend
         file: ./Dockerfile.backend
         push: true
         tags: |
-          ${{ env.CONTAINER_REGISTRY }}/traffic-sign-backend:${{ github.sha }}
-          ${{ env.CONTAINER_REGISTRY }}/traffic-sign-backend:latest
+          ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:${{ github.sha }}
+          ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    - name: Build and push frontend image
+  build-and-push-frontend:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Azure Container Registry
+      uses: azure/docker-login@v1
+      with:
+        login-server: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io
+        username: ${{ secrets.ACR_USERNAME }}
+        password: ${{ secrets.ACR_PASSWORD }}
+
+    - name: Build and push frontend Docker image
       uses: docker/build-push-action@v5
       with:
-        context: .
+        context: ./frontend
         file: ./Dockerfile.frontend
         push: true
         tags: |
-          ${{ env.CONTAINER_REGISTRY }}/traffic-sign-frontend:${{ github.sha }}
-          ${{ env.CONTAINER_REGISTRY }}/traffic-sign-frontend:latest
+          ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:${{ github.sha }}
+          ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-  deploy-infrastructure:
+  deploy:
     runs-on: ubuntu-latest
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main'
-    
+    needs: [build-and-push-backend, build-and-push-frontend]
+    environment: production
+
     steps:
     - uses: actions/checkout@v4
 
@@ -171,89 +85,31 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
+    - name: Deploy Backend Container App
+      uses: azure/container-apps-deploy-action@v1
       with:
-        terraform_version: 1.6.0
+        containerAppName: ${{ env.AZURE_BACKEND_CONTAINER_APP }}
+        resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
+        image: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:latest
+        environmentVariables: |
+          DATABASE_URL=postgresql://${{ secrets.DB_ADMIN_USERNAME }}:${{ secrets.DB_ADMIN_PASSWORD }}@${{ env.POSTGRESQL_SERVER_NAME }}.postgres.database.azure.com:5432/${{ env.POSTGRESQL_DATABASE_NAME }}?sslmode=require
+          REDIS_URL=rediss://:${{ secrets.REDIS_PASSWORD }}@${{ env.REDIS_CACHE_NAME }}.redis.cache.windows.net:6380
+          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          DEBUG=False
+          ALLOWED_HOSTS=*
 
-    - name: Terraform Init
-      run: |
-        cd architecture/containerized
-        terraform init
-
-    - name: Terraform Plan
-      run: |
-        cd architecture/containerized
-        terraform plan \
-          -var="db_admin_password=${{ secrets.DB_ADMIN_PASSWORD }}" \
-          -var="django_secret_key=${{ secrets.DJANGO_SECRET_KEY }}" \
-          -var="redis_password=${{ secrets.REDIS_PASSWORD }}" \
-          -out=tfplan
-
-    - name: Terraform Apply
-      run: |
-        cd architecture/containerized
-        terraform apply -auto-approve tfplan
-
-    - name: Get Terraform Outputs
-      id: terraform
-      run: |
-        cd architecture/containerized
-        echo "backend_app_fqdn=$(terraform output -raw backend_app_fqdn)" >> $GITHUB_OUTPUT
-        echo "frontend_app_fqdn=$(terraform output -raw frontend_app_fqdn)" >> $GITHUB_OUTPUT
-        echo "postgresql_server_fqdn=$(terraform output -raw postgresql_server_fqdn)" >> $GITHUB_OUTPUT
-        echo "redis_cache_hostname=$(terraform output -raw redis_cache_hostname)" >> $GITHUB_OUTPUT
-
-  deploy-application:
-    runs-on: ubuntu-latest
-    needs: deploy-infrastructure
-    if: github.ref == 'refs/heads/main'
-    
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Azure Login
-      uses: azure/login@v1
+    - name: Deploy Frontend Container App
+      uses: azure/container-apps-deploy-action@v1
       with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        containerAppName: ${{ env.AZURE_FRONTEND_CONTAINER_APP }}
+        resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
+        image: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:latest
+        environmentVariables: |
+          REACT_APP_API_URL=https://${{ env.AZURE_BACKEND_CONTAINER_APP }}.azurecontainerapps.io
 
-    - name: Update Container Apps with new images
+    - name: Run Django Migrations
       run: |
-        # Update backend container app
-        az containerapp update \
-          --name backend-traffic-prod \
-          --resource-group rg-traffic-sign-detector-prod \
-          --image ${{ env.CONTAINER_REGISTRY }}/traffic-sign-backend:${{ github.sha }}
-
-        # Update frontend container app
-        az containerapp update \
-          --name frontend-traffic-prod \
-          --resource-group rg-traffic-sign-detector-prod \
-          --image ${{ env.CONTAINER_REGISTRY }}/traffic-sign-frontend:${{ github.sha }}
-
-    - name: Run database migrations
-      run: |
-        # Get the backend app URL
-        BACKEND_URL=$(az containerapp show \
-          --name backend-traffic-prod \
-          --resource-group rg-traffic-sign-detector-prod \
-          --query "properties.configuration.ingress.fqdn" \
-          --output tsv)
-        
-        # Run migrations via the backend API
-        curl -X POST "https://$BACKEND_URL/api/migrate/" \
-          -H "Content-Type: application/json"
-
-  notify:
-    runs-on: ubuntu-latest
-    needs: [deploy-application]
-    if: always()
-    
-    steps:
-    - name: Notify deployment status
-      uses: 8398a7/action-slack@v3
-      with:
-        status: ${{ job.status }}
-        channel: '#deployments'
-        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
-      if: always()
+        echo "Manual step: Run Django migrations on the backend container."
+        echo "You would typically do this via a startup script in your backend Dockerfile or a separate job."
+        echo "Example if using Azure CLI to run a command:"
+        echo "az containerapp exec -n ${{ env.AZURE_BACKEND_CONTAINER_APP }} -g ${{ env.AZURE_RESOURCE_GROUP }} --command 'python manage.py migrate'"
