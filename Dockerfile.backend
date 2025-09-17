@@ -21,10 +21,10 @@ RUN apt-get update \
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy project
-COPY . /app/
+# Copy backend project files
+COPY backend/ /app/
 
-# Copy YOLO model
+# Copy YOLO model from project root
 COPY yolov8-gtsrb-trained.pt /app/
 
 # Create directory for media files
