@@ -260,8 +260,8 @@ resource "azurerm_container_app" "frontend" {
     container {
       name   = "frontend"
       image  = "mcr.microsoft.com/oryx/cli:builder-debian-bullseye-20230926.1"
-      cpu    = "0.5"
-      memory = "1Gi"
+      cpu    = 2.0
+      memory = "4Gi"
 
       env {
         name  = "REACT_APP_API_URL"
