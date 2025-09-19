@@ -9,11 +9,11 @@ on:
 env:
   AZURE_RESOURCE_GROUP: rg-traffic-sign-detector-prod
   AZURE_CONTAINER_REGISTRY: acrtrafficsignprod
-  AZURE_CONTAINER_APPS_ENVIRONMENT: cae-traffic-sign-detector-prod
+  AZURE_CONTAINER_APPS_ENVIRONMENT: whitestone-e7e06cfe
   AZURE_BACKEND_CONTAINER_APP: backend-traffic-prod
   AZURE_FRONTEND_CONTAINER_APP: frontend-traffic-prod
   POSTGRESQL_SERVER_NAME: psql-traffic-sign-prod-new
-  POSTGRESQL_DATABASE_NAME: traffic_sign_db
+  POSTGRESQL_DATABASE_NAME: traffic_sign_detector
   REDIS_CACHE_NAME: redis-traffic-sign-detector-prod
 
 jobs:
@@ -82,6 +82,7 @@ jobs:
   deploy-apps:
     needs: [build-and-push-backend, build-and-push-frontend]
     runs-on: ubuntu-latest
+    environment: production
     steps:
     - uses: actions/checkout@v4
 
@@ -93,21 +94,34 @@ jobs:
     - name: Deploy Backend Container App
       uses: azure/container-apps-deploy-action@v1
       with:
-        acrName: ${{ env.AZURE_CONTAINER_REGISTRY }}
         containerAppName: ${{ env.AZURE_BACKEND_CONTAINER_APP }}
         resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
-        imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:${{ github.sha }}
+        imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:latest
         containerAppEnvironment: ${{ env.AZURE_CONTAINER_APPS_ENVIRONMENT }}
+        acrName: ${{ env.AZURE_CONTAINER_REGISTRY }}
         acrUsername: ${{ secrets.ACR_USERNAME }}
         acrPassword: ${{ secrets.ACR_PASSWORD }}
+        targetPort: 8000
+        ingress: 'external'
+        environmentVariables: |
+          DATABASE_URL=postgresql://${{ secrets.DB_ADMIN_USERNAME }}:${{ secrets.DB_ADMIN_PASSWORD }}@${{ env.POSTGRESQL_SERVER_NAME }}.postgres.database.azure.com:5432/${{ env.POSTGRESQL_DATABASE_NAME }}?sslmode=require
+          REDIS_URL=rediss://:${{ secrets.REDIS_PASSWORD }}@${{ env.REDIS_CACHE_NAME }}.redis.cache.windows.net:6380/0
+          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+          DEBUG=False
+          ALLOWED_HOSTS=*.azurecontainerapps.io
+          APPLICATIONINSIGHTS_CONNECTION_STRING=${{ secrets.APPLICATION_INSIGHTS_CONNECTION_STRING }}
 
     - name: Deploy Frontend Container App
       uses: azure/container-apps-deploy-action@v1
       with:
-        acrName: ${{ env.AZURE_CONTAINER_REGISTRY }}
         containerAppName: ${{ env.AZURE_FRONTEND_CONTAINER_APP }}
         resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
-        imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:${{ github.sha }}
+        imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:latest
         containerAppEnvironment: ${{ env.AZURE_CONTAINER_APPS_ENVIRONMENT }}
+        acrName: ${{ env.AZURE_CONTAINER_REGISTRY }}
         acrUsername: ${{ secrets.ACR_USERNAME }}
         acrPassword: ${{ secrets.ACR_PASSWORD }}
+        targetPort: 80
+        ingress: 'external'
+        environmentVariables: |
+          REACT_APP_API_URL=https://${{ env.AZURE_BACKEND_CONTAINER_APP }}.whitestone-e7e06cfe.eastus.azurecontainerapps.io
