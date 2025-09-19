@@ -65,6 +65,7 @@ jobs:
         az containerapp update \
           --name ${{ env.AZURE_BACKEND_CONTAINER_APP }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --container-name backend \
           --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-app:latest
 
     - name: Scale Down Frontend Container App
