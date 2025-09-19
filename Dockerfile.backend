@@ -4,15 +4,24 @@ FROM python:3.10-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (same as Dockerfile.prod)
 RUN apt-get update && apt-get install -y \
-    postgresql-client \
-    build-essential \
+    gcc \
+    g++ \
     libpq-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    wget \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
