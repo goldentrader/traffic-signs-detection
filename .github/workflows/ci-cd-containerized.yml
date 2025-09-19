@@ -73,5 +73,5 @@ jobs:
         az containerapp update \
           --name ${{ env.AZURE_FRONTEND_CONTAINER_APP }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --min-replicas 0 \
-          --max-replicas 0
+          --min-replicas 1 \
+          --max-replicas 1
