@@ -9,19 +9,38 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Set work directory
 WORKDIR /app
 
-# Install system dependencies (same as Dockerfile.prod)
+# Install system dependencies step by step to identify issues
 RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     libpq-dev \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgomp1 \
     wget \
     curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Try to install OpenGL libraries one by one
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y \
+    libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y \
+    libsm6 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y \
+    libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y \
+    libxrender1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && apt-get install -y \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies

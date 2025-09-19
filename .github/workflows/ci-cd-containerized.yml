@@ -10,14 +10,13 @@ env:
   AZURE_RESOURCE_GROUP: rg-traffic-sign-detector-prod
   AZURE_CONTAINER_REGISTRY: acrtrafficsignprod
   AZURE_CONTAINER_APPS_ENVIRONMENT: whitestone-e7e06cfe
-  AZURE_BACKEND_CONTAINER_APP: backend-traffic-prod
-  AZURE_FRONTEND_CONTAINER_APP: frontend-traffic-prod
+  AZURE_APP_CONTAINER_APP: traffic-sign-app-prod
   POSTGRESQL_SERVER_NAME: psql-traffic-sign-prod-new
   POSTGRESQL_DATABASE_NAME: traffic_sign_detector
   REDIS_CACHE_NAME: redis-traffic-sign-detector-prod
 
 jobs:
-  build-and-push-backend:
+  build-and-push:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -38,49 +37,18 @@ jobs:
         username: ${{ secrets.ACR_USERNAME }}
         password: ${{ secrets.ACR_PASSWORD }}
 
-    - name: Build and push backend Docker image
+    - name: Build and push production Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ./Dockerfile.backend
+        file: ./Dockerfile.prod
         push: true
         tags: |
-          ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:${{ github.sha }}
-          ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:latest
+          ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-app:${{ github.sha }}
+          ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-app:latest
 
-  build-and-push-frontend:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Log in to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-    - name: Log in to Azure Container Registry
-      uses: azure/docker-login@v1
-      with:
-        login-server: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io
-        username: ${{ secrets.ACR_USERNAME }}
-        password: ${{ secrets.ACR_PASSWORD }}
-
-    - name: Build and push frontend Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile.frontend
-        push: true
-        tags: |
-          ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:${{ github.sha }}
-          ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:latest
-
-  deploy-apps:
-    needs: [build-and-push-backend, build-and-push-frontend]
+  deploy-app:
+    needs: [build-and-push]
     runs-on: ubuntu-latest
     environment: production
     steps:
@@ -91,18 +59,9 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Update Backend Container Image
+    - name: Update Container App Image
       run: |
         az containerapp update \
-          --name ${{ env.AZURE_BACKEND_CONTAINER_APP }} \
+          --name ${{ env.AZURE_APP_CONTAINER_APP }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --container-name backend \
-          --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:latest
-
-    - name: Update Frontend Container Image
-      run: |
-        az containerapp update \
-          --name ${{ env.AZURE_FRONTEND_CONTAINER_APP }} \
-          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
-          --container-name frontend \
-          --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:latest
+          --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-app:latest
