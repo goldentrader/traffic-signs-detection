@@ -103,6 +103,8 @@ jobs:
         acrPassword: ${{ secrets.ACR_PASSWORD }}
         targetPort: 8000
         ingress: 'external'
+        cpu: 1.0
+        memory: 2.0Gi
         environmentVariables: |
           DATABASE_URL=postgresql://${{ secrets.DB_ADMIN_USERNAME }}:${{ secrets.DB_ADMIN_PASSWORD }}@${{ env.POSTGRESQL_SERVER_NAME }}.postgres.database.azure.com:5432/${{ env.POSTGRESQL_DATABASE_NAME }}?sslmode=require
           REDIS_URL=rediss://:${{ secrets.REDIS_PASSWORD }}@${{ env.REDIS_CACHE_NAME }}.redis.cache.windows.net:6380/0
@@ -123,5 +125,7 @@ jobs:
         acrPassword: ${{ secrets.ACR_PASSWORD }}
         targetPort: 80
         ingress: 'external'
+        cpu: 0.5
+        memory: 1.0Gi
         environmentVariables: |
           REACT_APP_API_URL=https://${{ env.AZURE_BACKEND_CONTAINER_APP }}.whitestone-e7e06cfe.eastus.azurecontainerapps.io
