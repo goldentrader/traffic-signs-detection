@@ -91,37 +91,16 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Deploy Backend Container App
-      uses: azure/container-apps-deploy-action@v1
-      with:
-        containerAppName: ${{ env.AZURE_BACKEND_CONTAINER_APP }}
-        resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
-        imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:latest
-        containerAppEnvironment: ${{ env.AZURE_CONTAINER_APPS_ENVIRONMENT }}
-        acrName: ${{ env.AZURE_CONTAINER_REGISTRY }}
-        acrUsername: ${{ secrets.ACR_USERNAME }}
-        acrPassword: ${{ secrets.ACR_PASSWORD }}
-        targetPort: 8000
-        ingress: 'external'
-        environmentVariables: |
-          DATABASE_URL=postgresql://${{ secrets.DB_ADMIN_USERNAME }}:${{ secrets.DB_ADMIN_PASSWORD }}@${{ env.POSTGRESQL_SERVER_NAME }}.postgres.database.azure.com:5432/${{ env.POSTGRESQL_DATABASE_NAME }}?sslmode=require
-          REDIS_URL=rediss://:${{ secrets.REDIS_PASSWORD }}@${{ env.REDIS_CACHE_NAME }}.redis.cache.windows.net:6380/0
-          SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
-          DEBUG=False
-          ALLOWED_HOSTS=*.azurecontainerapps.io
-          APPLICATIONINSIGHTS_CONNECTION_STRING=${{ secrets.APPLICATION_INSIGHTS_CONNECTION_STRING }}
+    - name: Update Backend Container Image
+      run: |
+        az containerapp update \
+          --name ${{ env.AZURE_BACKEND_CONTAINER_APP }} \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:latest
 
-    - name: Deploy Frontend Container App
-      uses: azure/container-apps-deploy-action@v1
-      with:
-        containerAppName: ${{ env.AZURE_FRONTEND_CONTAINER_APP }}
-        resourceGroup: ${{ env.AZURE_RESOURCE_GROUP }}
-        imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:latest
-        containerAppEnvironment: ${{ env.AZURE_CONTAINER_APPS_ENVIRONMENT }}
-        acrName: ${{ env.AZURE_CONTAINER_REGISTRY }}
-        acrUsername: ${{ secrets.ACR_USERNAME }}
-        acrPassword: ${{ secrets.ACR_PASSWORD }}
-        targetPort: 80
-        ingress: 'external'
-        environmentVariables: |
-          REACT_APP_API_URL=https://${{ env.AZURE_BACKEND_CONTAINER_APP }}.whitestone-e7e06cfe.eastus.azurecontainerapps.io
+    - name: Update Frontend Container Image
+      run: |
+        az containerapp update \
+          --name ${{ env.AZURE_FRONTEND_CONTAINER_APP }} \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:latest
