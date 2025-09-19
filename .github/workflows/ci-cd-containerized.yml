@@ -10,7 +10,8 @@ env:
   AZURE_RESOURCE_GROUP: rg-traffic-sign-detector-prod
   AZURE_CONTAINER_REGISTRY: acrtrafficsignprod
   AZURE_CONTAINER_APPS_ENVIRONMENT: whitestone-e7e06cfe
-  AZURE_APP_CONTAINER_APP: traffic-sign-app-prod
+  AZURE_BACKEND_CONTAINER_APP: backend-traffic-prod
+  AZURE_FRONTEND_CONTAINER_APP: frontend-traffic-prod
   POSTGRESQL_SERVER_NAME: psql-traffic-sign-prod-new
   POSTGRESQL_DATABASE_NAME: traffic_sign_detector
   REDIS_CACHE_NAME: redis-traffic-sign-detector-prod
@@ -59,9 +60,17 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    - name: Update Container App Image
+    - name: Update Backend Container App (Full Stack)
       run: |
         az containerapp update \
-          --name ${{ env.AZURE_APP_CONTAINER_APP }} \
+          --name ${{ env.AZURE_BACKEND_CONTAINER_APP }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
           --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-app:latest
+
+    - name: Scale Down Frontend Container App
+      run: |
+        az containerapp update \
+          --name ${{ env.AZURE_FRONTEND_CONTAINER_APP }} \
+          --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --min-replicas 0 \
+          --max-replicas 0
