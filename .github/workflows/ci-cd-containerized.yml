@@ -96,6 +96,7 @@ jobs:
         az containerapp update \
           --name ${{ env.AZURE_BACKEND_CONTAINER_APP }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --container-name backend \
           --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-backend:latest
 
     - name: Update Frontend Container Image
@@ -103,4 +104,5 @@ jobs:
         az containerapp update \
           --name ${{ env.AZURE_FRONTEND_CONTAINER_APP }} \
           --resource-group ${{ env.AZURE_RESOURCE_GROUP }} \
+          --container-name frontend \
           --image ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/traffic-sign-frontend:latest
